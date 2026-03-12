@@ -71,9 +71,9 @@ local Library do
         FadeSpeed = 0.2,
 
         Folders = {
-            Directory = "lyapossss",
-            Configs = "lyapossss/Configs",
-            Assets = "lyapossss/Assets",
+            Directory = "NyahHub",
+            Configs = "NyahHub/Configs",
+            Assets = "NyahHub/Assets",
         },
 
         -- Ignore below
@@ -180,7 +180,7 @@ local Library do
 
     local Themes = {
         ["Preset"] = {
-            ["AccentGradient"] = FromRGB(0, 195, 255),   -- Slightly deeper blue accent
+            ["AccentGradient"] = FromRGB(255, 255, 255),   -- Slightly deeper blue accent
             ["Background 2"] = FromRGB(10, 10, 12),      -- Very dark gray
             ["Background"] = FromRGB(12, 12, 14),        -- Main near-black background
             ["Text"] = FromRGB(235, 235, 235),           -- Slightly dimmed light text
@@ -188,19 +188,14 @@ local Library do
             ["Section Top"] = FromRGB(28, 27, 31),       -- Dark section header
             ["Section Background"] = FromRGB(10, 10, 12),-- Deep black section background
             ["Section Background 2"] = FromRGB(14, 14, 16),-- Alternate section, minimal difference
-            ["Accent"] = FromRGB(0, 116, 224),           -- Darker blue accent for consistency
+            ["Accent"] = FromRGB(255, 255, 255),           -- Darker blue accent for consistency
             ["Element"] = FromRGB(16, 16, 18)            -- Deep gray for UI elements
         }
     }
 
     Library.Theme = TableClone(Themes["Preset"])
 
-    -- Folders
-    for Index, Value in Library.Folders do 
-        if not isfolder(Value) then
-            makefolder(Value)
-        end
-    end
+    -- Folders are now initialized later in Library.Window to allow custom names
 
     -- Tweening
     local Tween = { } do
@@ -2260,11 +2255,37 @@ local Library do
 
         Library.Window = function(self, Data)
             Data = Data or { }
+            
+            -- Setup Custom Folders
+            if Data.Folder then
+                Library.Folders.Directory = Data.Folder
+                Library.Folders.Configs = Data.Folder .. "/Configs"
+                Library.Folders.Assets = Data.Folder .. "/Assets"
+            end
+            
+            -- Initialize Folders
+            for Index, Value in Library.Folders do 
+                if not isfolder(Value) then
+                    makefolder(Value)
+                end
+            end
+            
+            -- Apply Custom Colors/Themes
+            if Data.Theme then
+                for Key, Color in pairs(Data.Theme) do
+                    Library.Theme[Key] = Color
+                end
+            end
+            
+            -- Apply Custom Keybind
+            if Data.MenuKeybind then
+                Library.MenuKeybind = tostring(Data.MenuKeybind)
+            end
 
             local Window = {
                 Name = Data.Name or Data.name or "Window",
                 SubName = Data.SubName or Data.subname or "Fine-tuning for sure wins",
-                Logo = Data.Logo or Data.logo or "1l20959262762131",
+                Logo = Data.Logo or Data.logo or "120959262762131",
                 
                 Pages = { },
                 Items = { },

@@ -3,7 +3,7 @@ repeat task.wait() until game:IsLoaded()
 
 -- Try to load the library from our local file for testing purposes
 -- Normally this would be a loadstring(game:HttpGet("YOUR_LINK.lua"))()
-local NyahLib = assert(loadfile("C:/Users/omarj/Desktop/roblox/loader/NyahLib.lua"))()
+local NyahLib = assert(loadstring(game:HttpGet("https://raw.githubusercontent.com/vixzury/nyahn/refs/heads/main/lib.lua"))())
 
 -- Create the Main Window
 local Window = NyahLib:CreateWindow({

@@ -1,6 +1,6 @@
 --[[
     kiwisense
-    Made by samet
+    Made by Sanety
 
     assign different flags to each element to prevent from configs overriding eachother
     example is at the bottom
@@ -123,6 +123,49 @@
 
 local LoadingTick = os.clock()
 
+local function GetService(Name)
+    local Success, Service = pcall(game.GetService, game, Name)
+    if Success and Service then
+        return typeof(cloneref) == "function" and cloneref(Service) or Service
+    end
+    return nil
+end
+
+-- Consolidated Services
+local Workspace = GetService("Workspace")
+local RunService = GetService("RunService")
+local HttpService = GetService("HttpService")
+local Players = GetService("Players")
+local TweenService = GetService("TweenService")
+local UserInputService = GetService("UserInputService")
+local SoundService = GetService("SoundService")
+local CoreGui = GetService("CoreGui")
+
+-- Localized Globals
+local Vector2New, Vector3New, CFrameNew, UDim2New, UDimNew = Vector2.new, Vector3.new, CFrame.new, UDim2.new, UDim.new
+local Color3RGB, Color3HSV, Color3Hex = Color3.fromRGB, Color3.fromHSV, Color3.fromHex
+local ColorSequenceNew, ColorSequenceKeypointNew = ColorSequence.new, ColorSequenceKeypoint.new
+local NumberSequenceNew, NumberSequenceKeypointNew = NumberSequence.new, NumberSequenceKeypoint.new
+local RectNew = Rect.new
+local UDim2FromOffset, UDim2FromScale = UDim2.fromOffset, UDim2.fromScale
+
+local MathClamp, MathFloor, MathAbs, MathMax, MathMin, MathRound, MathSin, MathRad = math.clamp, math.floor, math.abs, math.max, math.min, math.round, math.sin, math.rad
+local TableInsert, TableFind, TableRemove, TableUnpack, TableConcat, TableSort, TableClone = table.insert, table.find, table.remove, table.unpack, table.concat, table.sort, table.clone
+local StringFormat, StringSub, StringGSub, StringMatch, StringLower, StringFind = string.format, string.sub, string.gsub, string.match, string.lower, string.find
+local TaskWait, TaskDelay, TaskSpawn, TaskDefer = task.wait, task.delay, task.spawn, task.defer
+
+local InstanceNew = Instance.new
+local Camera = Workspace.CurrentCamera
+
+-- Aliases for compatibility
+local FromRGB, FromHSV, FromHex = Color3RGB, Color3HSV, Color3Hex
+local RGBSequence, RGBSequenceKeypoint = ColorSequenceNew, ColorSequenceKeypointNew
+local NumSequence, NumSequenceKeypoint = NumberSequenceNew, NumberSequenceKeypointNew
+
+gethui = gethui or function()
+    return CoreGui
+end
+
 if getgenv().Library then
     getgenv().Library:Unload()
 end
@@ -135,30 +178,24 @@ local Options, MiscOptions do
         getgenv().Esp.Unload()
     end 
 
-    local Workspace = cloneref(game:GetService("Workspace"))
-    local RunService = cloneref(game:GetService("RunService"))
-    local HttpService = cloneref(game:GetService("HttpService"))
-    local Players = cloneref(game:GetService("Players"))
-    local TweenService = cloneref(game:GetService("TweenService"))
-
-    local vec2 = Vector2.new
-    local vec3 = Vector3.new
-    local dim2 = UDim2.new
-    local dim = UDim.new 
-    local rect = Rect.new
-    local cfr = CFrame.new
+    local camera = Camera
+    local vec2 = Vector2New
+    local vec3 = Vector3New
+    local dim2 = UDim2New
+    local dim = UDimNew 
+    local rect = RectNew
+    local cfr = CFrameNew
     local empty_cfr = cfr()
     local angle = CFrame.Angles
-    local dim_offset = UDim2.fromOffset
+    local dim_offset = UDim2FromOffset
 
-    local rgb = Color3.fromRGB
-    local hex = Color3.fromHex
-    local hsv = Color3.fromHSV
-    local rgbseq = ColorSequence.new
-    local rgbkey = ColorSequenceKeypoint.new
-    local numseq = NumberSequence.new
-    local numkey = NumberSequenceKeypoint.new
-    local camera = Workspace.CurrentCamera
+    local rgb = Color3RGB
+    local hex = Color3Hex
+    local hsv = Color3HSV
+    local rgbseq = ColorSequenceNew
+    local rgbkey = ColorSequenceKeypointNew
+    local numseq = NumberSequenceNew
+    local numkey = NumberSequenceKeypointNew
 
     local Bones = {
         {"Head", "UpperTorso"},
@@ -304,53 +341,70 @@ local Options, MiscOptions do
             return Ins 
         end
 
-        function Esp:ConvertScreenPoint(world_position)
-            local ViewportSize = camera.ViewportSize
-            local LocalPos = camera.CFrame:pointToObjectSpace(world_position) 
+        local lastViewportSize = Vector2New(0, 0)
+        local lastFOV = 0
+        local aspect, halfY, halfX
 
-            local AspectRatio = ViewportSize.X / ViewportSize.Y
-            local HalfY = -LocalPos.Z * math.tan(math.rad(camera.FieldOfView / 2))
-            local HalfX = AspectRatio * HalfY
+        function Esp:ConvertScreenPoint(world_position)
+            local viewportSize = Camera.ViewportSize
+            local fov = Camera.FieldOfView
+
+            if viewportSize ~= lastViewportSize or fov ~= lastFOV then
+                lastViewportSize = viewportSize
+                lastFOV = fov
+                aspect = viewportSize.X / viewportSize.Y
+                halfY = math.tan(MathRad(fov / 2))
+                halfX = aspect * halfY
+            end
+
+            local localPos = Camera.CFrame:PointToObjectSpace(world_position)
+            local depth = -localPos.Z
             
-            local FarPlaneCorner = Vector3.new(-HalfX, HalfY, LocalPos.Z)
-            local RelativePos = LocalPos - FarPlaneCorner
-        
-            local ScreenX = RelativePos.X / (HalfX * 2)
-            local ScreenY = -RelativePos.Y / (HalfY * 2)
+            if depth <= 0 then
+                return vec3(0, 0, 0), false
+            end
+
+            local hY = depth * halfY
+            local hX = aspect * hY
             
-            local OnScreen = -LocalPos.Z > 0 and ScreenX >= 0 and ScreenX <= 1 and ScreenY >= 0 and ScreenY <= 1
+            local screenX = (localPos.X / (hX * 2)) + 0.5
+            local screenY = (-localPos.Y / (hY * 2)) + 0.5
             
-            -- returns in pixels as opposed to scale
-            return Vector3.new(ScreenX * ViewportSize.X, ScreenY * ViewportSize.Y, -LocalPos.Z), OnScreen
+            local onScreen = screenX >= 0 and screenX <= 1 and screenY >= 0 and screenY <= 1
+            
+            return vec3(screenX * viewportSize.X, screenY * viewportSize.Y, depth), onScreen
         end
 
         function Esp:Connection(signal, callback)
             local Connection = signal:Connect(callback)
-            Esp.Connections[#Esp.Connections + 1] = Connection
-            
+            TableInsert(Esp.Connections, Connection)
             return Connection 
         end
 
-        function Esp:BoxSolve(torso)
-            if not torso then
+        function Esp:BoxSolve(rootPart)
+            if not rootPart then
                 return nil, nil, nil
             end 
 
-            local ViewportTop = torso.Position + (torso.CFrame.UpVector * 1.8) + camera.CFrame.UpVector
-            local ViewportBottom = torso.Position - (torso.CFrame.UpVector * 2.5) - camera.CFrame.UpVector
-            local Distance = (torso.Position - camera.CFrame.p).Magnitude
-
-            local NewDistance = math.floor(Distance * 0.333)
-
-            local Top, TopIsRendered = Esp:ConvertScreenPoint(ViewportTop)
-            local Bottom, BottomIsRendered = Esp:ConvertScreenPoint(ViewportBottom)
-
-            local Width = math.max(math.floor(math.abs(Top.X - Bottom.X)), 3)
-            local Height = math.max(math.floor(math.max(math.abs(Bottom.Y - Top.Y), Width / 2)), 3)
-            local BoxSize = Vector2.new(math.floor(math.max(Height / 1.5, Width)), Height)
-            local BoxPosition = Vector2.new(math.floor(Top.X * 0.5 + Bottom.X * 0.5 - BoxSize.X * 0.5), math.floor(math.min(Top.Y, Bottom.Y)))
+            local rootPos = rootPart.Position
+            local camCF = Camera.CFrame
+            local camPos = camCF.Position
             
-            return BoxSize, BoxPosition, TopIsRendered, NewDistance 
+            local viewportTop = rootPos + (rootPart.CFrame.UpVector * 1.8) + camCF.UpVector
+            local viewportBottom = rootPos - (rootPart.CFrame.UpVector * 2.5) - camCF.UpVector
+            local distance = (rootPos - camPos).Magnitude
+
+            local newDistance = MathFloor(distance * 0.333)
+
+            local top, topOn = Esp:ConvertScreenPoint(viewportTop)
+            local bottom, bottomOn = Esp:ConvertScreenPoint(viewportBottom)
+
+            local width = MathMax(MathFloor(MathAbs(top.X - bottom.X)), 3)
+            local height = MathMax(MathFloor(MathMax(MathAbs(bottom.Y - top.Y), width / 2)), 3)
+            local boxSize = vec2(MathFloor(MathMax(height / 1.5, width)), height)
+            local boxPosition = vec2(MathFloor(top.X * 0.5 + bottom.X * 0.5 - boxSize.X * 0.5), MathFloor(MathMin(top.Y, bottom.Y)))
+            
+            return boxSize, boxPosition, topOn or bottomOn, newDistance 
         end
 
         function Esp:Lerp(start, finish, t)
@@ -1054,66 +1108,45 @@ local Options, MiscOptions do
         end
 
         function Esp.Update() -- IMPORTANT! 
-            if not Esp then 
+            if not Esp or not Options.Enabled then 
                 return 
             end 
 
-            if Options.Enabled == false then
-                return 
-            end 
+            for _, Data in Esp.Players do
+                local info = Data.Info
+                if not info then continue end 
 
-            for _,Data in Esp.Players do
-                if not Data.Info then
-                    continue 
-                end 
-            
-                local Character = Data.Info.Character
+                local root = info.rootpart or (info.Character and info.Character:FindFirstChild("HumanoidRootPart"))
+                if not root then continue end
 
-                if not Character then 
-                    continue 
-                end 
+                local items = Data.Items 
+                if not items then continue end 
 
-                local Humanoid = Data.Info.Humanoid 
+                local boxSize, boxPos, onScreen, distance = Esp:BoxSolve(root)
+                local holder = items.Holder
 
-                if not Humanoid then
-                    continue 
+                if holder.Visible ~= onScreen then 
+                    holder.Visible = onScreen
                 end 
 
-                if not (Character or Humanoid) then 
-                    continue 
-                end 
-                
-                local Items = Data and Data.Items 
-
-                if not Items then 
-                    continue 
-                end 
-
-                local BoxSize, BoxPos, OnScreen, Distance = Esp:BoxSolve(Humanoid.RootPart)
-                local Holder = Items["Holder"]
-
-                if Holder.Visible ~= OnScreen then 
-                    Holder.Visible = OnScreen
-                end 
-
-                if not OnScreen then
+                if not onScreen then
                     continue
                 end 
 
-                local Pos = dim_offset(BoxPos.X, BoxPos.Y)
-                if Pos ~= Holder.Position then 
-                    Holder.Position = Pos
+                local pos = dim_offset(boxPos.X, boxPos.Y)
+                if holder.Position ~= pos then 
+                    holder.Position = pos
                 end 
                 
-                local Size = dim2(0, BoxSize.X, 0, BoxSize.Y)
-                if Size ~= Holder.Size then 
-                    Holder.Size = Size
+                local size = dim2(0, boxSize.X, 0, boxSize.Y)
+                if holder.Size ~= size then 
+                    holder.Size = size
                 end 
 
-                local DistanceLabel = Items.Distance
-                local Text = tostring( math.round(Distance) )  .. "m"
-                if DistanceLabel.Text ~= Text then 
-                    DistanceLabel.Text = Text
+                local distanceLabel = items.Distance
+                local text = MathRound(distance) .. "m"
+                if distanceLabel.Text ~= text then 
+                    distanceLabel.Text = text
                 end 
                 
                 -- if Options["Box Fill"] and Options["Box Spin"] then 
@@ -1427,64 +1460,10 @@ end
 
 -- beware of somewhat horrible code
 local Library do
-    -- Services
-    local Players = game:GetService("Players")
-    local UserInputService = game:GetService("UserInputService")
-    local HttpService = game:GetService("HttpService")
-    local TweenService = game:GetService("TweenService")
-    local RunService = game:GetService("RunService")
-    local Workspace = game:GetService("Workspace")
-    local SoundService = cloneref and cloneref(game:GetService("SoundService")) or game:GetService("SoundService")
-    local CoreGui = cloneref and cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui")
+    -- Services and Variables already localized at top
 
-    -- Variables
     local LocalPlayer = Players.LocalPlayer
-    local Camera = Workspace.CurrentCamera
     local Mouse = LocalPlayer:GetMouse()
-
-    -- Globals
-    local FromRGB = Color3.fromRGB
-    local FromHSV = Color3.fromHSV
-    local FromHex = Color3.fromHex
-
-    local RGBSequence = ColorSequence.new
-    local RGBSequenceKeypoint = ColorSequenceKeypoint.new
-
-    local NumSequence = NumberSequence.new
-    local NumSequenceKeypoint = NumberSequenceKeypoint.new
-
-    local UDim2New = UDim2.new
-    local UDimNew = UDim.new
-    local UDim2FromScale = UDim2.fromScale
-    local Vector2New = Vector2.new
-
-    local InstanceNew = Instance.new
-
-    local MathClamp = math.clamp
-    local MathFloor = math.floor
-    local MathAbs = math.abs
-    local MathSin = math.sin
-    local MathRad = math.rad
-    local MathMax = math.max
-    local MathMin = math.min
-
-    local TableInsert = table.insert
-    local TableFind = table.find
-    local TableUnpack = table.unpack
-    local TableRemove = table.remove
-    local TableConcat = table.concat
-    local TableClone = table.clone
-
-    local StringFormat = string.format
-    local StringFind = string.find
-    local StringGSub = string.gsub
-    local StringLower = string.lower
-
-    local CFrameNew = CFrame.new
-    local CFrameAngles = CFrame.Angles
-    local Vector3New = Vector3.new
-
-    local RectNew = Rect.new
 
     local IsMobile = UserInputService.TouchEnabled or false
 
@@ -1744,17 +1723,16 @@ local Library do
     local Instances = { } do
         Instances.__index = Instances
 
-        Instances.Create = function(self, Class, Properties)
-            local NewItem = {
-                Instance = InstanceNew(Class),
+        function Instances:Create(Class, Properties)
+            local instance = InstanceNew(Class)
+            local NewItem = setmetatable({
+                Instance = instance,
                 Properties = Properties,
                 Class = Class
-            }
+            }, Instances)
 
-            setmetatable(NewItem, Instances)
-
-            for Property, Value in NewItem.Properties do
-                NewItem.Instance[Property] = Value
+            for Property, Value in Properties do
+                instance[Property] = Value
             end
 
             return NewItem
@@ -2332,24 +2310,22 @@ local Library do
         return StringFormat("Flag Number %s %s", FlagNumber, HttpService:GenerateGUID(false))
     end
 
-    Library.AddToTheme = function(self, Item, Properties)
-        Item = Item.Instance or Item 
+    Library.ThemeItems = {} -- Changed to group by theme key for performance
 
-        local ThemeData = {
-            Item = Item,
-            Properties = Properties,
-        }
+    function Library:AddToTheme(Item, Properties)
+        Item = typeof(Item) == "table" and Item.Instance or Item 
 
-        for Property, Value in ThemeData.Properties do
+        for Property, Value in Properties do
             if type(Value) == "string" then
                 Item[Property] = self.Theme[Value]
+                
+                self.ThemeItems[Value] = self.ThemeItems[Value] or {}
+                TableInsert(self.ThemeItems[Value], {Item = Item, Property = Property})
             else
-                Item[Property] = Value()
+                -- Function or direct value
+                Item[Property] = typeof(Value) == "function" and Value() or Value
             end
         end
-
-        TableInsert(self.ThemeItems, ThemeData)
-        self.ThemeMap[Item] = ThemeData
     end
 
     Library.GetConfig = function(self)
@@ -2451,27 +2427,29 @@ local Library do
         end
     end
 
-    Library.ChangeItemTheme = function(self, Item, Properties)
-        Item = Item.Instance or Item
+    function Library:ChangeItemTheme(Item, Properties)
+        Item = typeof(Item) == "table" and Item.Instance or Item
 
-        if not self.ThemeMap[Item] then 
-            return
+        -- Remove existing registrations for this item
+        for Key, Items in self.ThemeItems do
+            for i = #Items, 1, -1 do
+                if Items[i].Item == Item then
+                    TableRemove(Items, i)
+                end
+            end
         end
 
-        self.ThemeMap[Item].Properties = Properties
-        self.ThemeMap[Item] = self.ThemeMap[Item]
+        self:AddToTheme(Item, Properties)
     end
 
-    Library.ChangeTheme = function(self, Theme, Color)
+    function Library:ChangeTheme(Theme, Color)
         self.Theme[Theme] = Color
 
-        for _, Item in self.ThemeItems do
-            for Property, Value in Item.Properties do
-                if type(Value) == "string" and Value == Theme then
-                    Item.Item[Property] = Color
-                elseif type(Value) == "function" then
-                    Item.Item[Property] = Value()
-                end
+        local items = self.ThemeItems[Theme]
+        if items then
+            for i = 1, #items do
+                local data = items[i]
+                data.Item[data.Property] = Color
             end
         end
     end

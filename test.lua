@@ -2313,7 +2313,7 @@ local Library do
     Library.ThemeItems = {} -- Changed to group by theme key for performance
 
     function Library:AddToTheme(Item, Properties)
-        Item = Item.Instance or Item 
+        Item = typeof(Item) == "table" and Item.Instance or Item 
 
         for Property, Value in Properties do
             if type(Value) == "string" then
@@ -2428,7 +2428,7 @@ local Library do
     end
 
     function Library:ChangeItemTheme(Item, Properties)
-        Item = Item.Instance or Item
+        Item = typeof(Item) == "table" and Item.Instance or Item
 
         -- Remove existing registrations for this item
         for Key, Items in self.ThemeItems do
